@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package mitsuhitofujita.calyx.v1;
+
+option go_package = "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1;calyxv1";
+
+// SampleService is a proof-of-concept service used to validate the gRPC pipeline
+// (code generation, network listener, and message serialization) before the real
+// authentication service is implemented.
+service SampleService {
+  // Hello returns a greeting for the given name.
+  rpc Hello(HelloRequest) returns (HelloResponse);
+}
+
+message HelloRequest {
+  // name is the name of the user or caller.
+  string name = 1;
+}
+
+message HelloResponse {
+  // message is the greeting, formatted as "Hello, {name}.".
+  string message = 1;
+}
