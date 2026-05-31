@@ -21,3 +21,5 @@ RUN groupadd -g ${VSCODE_GID} ${VSCODE_GROUP} && \
 WORKDIR ${WORKSPACE_DIR}
 
 USER ${VSCODE_USER}
+
+RUN curl -fsSL https://claude.ai/install.sh | bash
