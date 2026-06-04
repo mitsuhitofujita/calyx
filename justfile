@@ -31,9 +31,11 @@ generate: lint
     buf generate
     go mod tidy
 
-# Compile all packages.
+# Compile all packages and output binaries.
 build:
-    go build ./...
+    @mkdir -p bin
+    go build -o bin/calyx ./apps/cli
+    go build -o bin/backend ./apps/backend
 
 # Run the Go test suite.
 test:
