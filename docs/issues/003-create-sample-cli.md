@@ -10,8 +10,8 @@ Create the skeleton for the command-line interface (CLI) application named `caly
 At this stage, the CLI should only support printing its version (`v0.0.0`) when invoked with the `--version` or `-version` flags, and displaying usage instructions when run without arguments or with helper flags.
 
 ## Background
-According to [intent.md](file:///home/mitsuhito/repos/github/calyx/docs/intent.md) and [spec.md](file:///home/mitsuhito/repos/github/calyx/docs/spec.md), Calyx requires a client-side CLI tool (`apps/cli`) that users and AI agents will operate.
-As the first step outlined in the `.local/state.md` under "開発中" (In Development), we need to set up the basic structure of this Go CLI so that it compiles and supports basic version/usage options.
+According to "intent.md" and "spec.md", Calyx requires a client-side CLI tool (`apps/cli`) that users and AI agents will operate.
+We need to set up the basic structure of this Go CLI so that it compiles and supports basic version/usage options.
 
 ## Technical Specifications
 

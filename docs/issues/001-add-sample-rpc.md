@@ -9,7 +9,7 @@
 Implement a sample gRPC service and RPC endpoint in the backend (`apps/backend`) using Go. This serves as a Proof of Concept (PoC) to verify the gRPC code generation setup, network listener configuration, and message serialization/deserialization before implementing the main authentication service.
 
 ## Background
-According to [intent.md](file:///home/mitsuhito/repos/github/calyx/docs/intent.md) and [spec.md](file:///home/mitsuhito/repos/github/calyx/docs/spec.md), Calyx communicates between the client CLI (`apps/cli`) and the remote server backend (`apps/backend`) using the gRPC protocol. Before implementing complex Google OAuth2 integrations and token credential storage workflows, we need to ensure the basic gRPC pipeline works.
+According to "intent.md" and "spec.md", Calyx communicates between the client CLI (`apps/cli`) and the remote server backend (`apps/backend`) using the gRPC protocol. Before implementing complex Google OAuth2 integrations and token credential storage workflows, we need to ensure the basic gRPC pipeline works.
 
 ## Technical Specifications
 

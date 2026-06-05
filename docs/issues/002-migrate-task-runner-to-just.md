@@ -9,7 +9,7 @@
 Migrate the project's task runner from GNU Make (`Makefile`) to `just` (`justfile`). This improvement will simplify script maintenance and leverage `just` features such as built-in help listing, clean syntax, and clean parameter handling.
 
 ## Background
-According to [.local/state.md](file:///home/mitsuhito/repos/github/calyx/.local/state.md), the project is transitioning its task execution framework from `make` to `just`. The `just` binary is already installed inside the development container environment, so the developer only needs to write the `justfile`, test its tasks, and delete the obsolete `Makefile`.
+The project is transitioning its task execution framework from `make` to `just`. The `just` binary is already installed inside the development container environment, so the developer only needs to write the `justfile`, test its tasks, and delete the obsolete `Makefile`.
 
 ## Technical Specifications
 
@@ -76,9 +76,6 @@ Validate that all recipes work correctly.
 
 ### Step 3: Remove `Makefile`
 Once all recipes in `justfile` are successfully validated, remove the obsolete `Makefile`.
-
-### Step 4: Update State File
-Once completed, update the `.local/state.md` to reflect that the task runner migration has been completed.
 
 ## Verification and Testing Plan
 
