@@ -11,6 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	calyxv1 "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1"
 )
@@ -33,7 +34,7 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nCommands:\n")
 		fmt.Fprintf(os.Stderr, "  sample hello <name>   greet <name> via the backend\n")
-		fmt.Fprintf(os.Stderr, "  auth login            sign in with Google (prints the Google ID token; development-only)\n")
+		fmt.Fprintf(os.Stderr, "  auth login            sign in with Google and store a session token\n")
 	}
 
 	flag.Parse()
@@ -90,25 +91,67 @@ func runHello(args []string) error {
 	}
 	name := args[0]
 
-	conn, err := grpc.NewClient(backendAddr(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := dialBackend()
 	if err != nil {
-		return fmt.Errorf("failed to connect to backend: %w", err)
+		return err
 	}
 	defer conn.Close()
 
-	client := calyxv1.NewSampleServiceClient(conn)
+	msg, err := sayHello(calyxv1.NewSampleServiceClient(conn), name)
+	if err != nil {
+		return err
+	}
 
+	fmt.Println(msg)
+	return nil
+}
+
+// dialBackend opens an insecure (dev) gRPC client conn to the backend; the caller
+// is responsible for closing it.
+func dialBackend() (*grpc.ClientConn, error) {
+	conn, err := grpc.NewClient(backendAddr(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to backend: %w", err)
+	}
+	return conn, nil
+}
+
+// withAuth attaches "authorization: Bearer <jwt>" when a session token is stored.
+// A missing token (ErrNoToken) returns ctx unchanged plus a login hint; a
+// misconfigured store or a load failure returns an error so the caller can
+// hard-fail.
+func withAuth(ctx context.Context) (context.Context, error) {
+	store, err := NewTokenStore()
+	if err != nil {
+		return nil, err
+	}
+	tok, err := store.Load()
+	if errors.Is(err, ErrNoToken) {
+		fmt.Fprintln(os.Stderr, "hint: not logged in; run `calyx auth login` to authenticate.")
+		return ctx, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not load session token: %w", err)
+	}
+	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+tok.Token), nil
+}
+
+// sayHello is the testable RPC unit: it applies withAuth, then calls Hello.
+func sayHello(client calyxv1.SampleServiceClient, name string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
 
-	resp, err := client.Hello(ctx, &calyxv1.HelloRequest{Name: name})
+	ctx, err := withAuth(ctx)
 	if err != nil {
-		return fmt.Errorf("gRPC call failed: %w", err)
+		return "", err
 	}
 
-	fmt.Println(resp.GetMessage())
-	return nil
+	resp, err := client.Hello(ctx, &calyxv1.HelloRequest{Name: name})
+	if err != nil {
+		return "", fmt.Errorf("gRPC call failed: %w", err)
+	}
+	return resp.GetMessage(), nil
 }
 
 // backendAddr returns CALYX_BACKEND_ADDR, or defaultBackendAddr when unset/empty.

@@ -15,6 +15,8 @@ import (
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	calyxv1 "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1"
 )
 
 const (
@@ -27,6 +29,11 @@ const (
 	defaultRedirectAddr = "127.0.0.1:8765"
 	callbackPath        = "/callback"
 	loginTimeout        = 3 * time.Minute
+
+	// backendCallTimeout bounds the dial+RPC to exchange the Google ID token for a
+	// session token. It is independent of loginTimeout (which covers the interactive
+	// browser sign-in).
+	backendCallTimeout = 10 * time.Second
 )
 
 // runAuth dispatches `calyx auth` subcommands.
@@ -44,12 +51,10 @@ func runAuth(args []string) error {
 	}
 }
 
-// runAuthLogin runs the browser-based Google OAuth flow and prints the obtained
-// Google ID token to stdout.
-//
-// DEVELOPMENT-ONLY: printing the token is a temporary, verification-only measure
-// for this phase. It MUST be removed once the backend AuthService.Login exchange
-// and credential-store persistence land (see docs/issues/005-add-cli-google-auth-login.md).
+// runAuthLogin runs the browser-based Google OAuth flow, exchanges the obtained
+// Google ID token for a Calyx session token via AuthService.Login, persists the
+// session token via the configured TokenStore, and prints a non-secret
+// confirmation. The session JWT is never written to stdout/stderr.
 func runAuthLogin(args []string) error {
 	if len(args) != 0 {
 		fmt.Fprintln(os.Stderr, "usage: calyx auth login")
@@ -82,15 +87,54 @@ func runAuthLogin(args []string) error {
 		Scopes:       []string{"openid", "email", "profile"},
 	}
 
+	// Resolve the store before opening a browser so a misconfigured
+	// CALYX_TOKEN_STORE fails fast without an interactive sign-in.
+	store, err := NewTokenStore()
+	if err != nil {
+		return err
+	}
+
 	idToken, err := authorize(conf, redirectAddr)
 	if err != nil {
 		return err
 	}
 
-	// DEVELOPMENT-ONLY: print the Google ID token. Remove once the backend
-	// AuthService.Login exchange and credential-store persistence land.
-	fmt.Println(idToken)
+	sess, err := exchangeIDToken(idToken)
+	if err != nil {
+		return err
+	}
+
+	if err := store.Save(sess); err != nil {
+		return fmt.Errorf("failed to save session token: %w", err)
+	}
+
+	fmt.Printf("Logged in. Session valid until %s.\n", sess.ExpiresAt.UTC().Format(time.RFC3339))
 	return nil
+}
+
+// exchangeIDToken dials the backend and exchanges a Google ID token for a Calyx
+// session token via AuthService.Login.
+func exchangeIDToken(idToken string) (SessionToken, error) {
+	conn, err := dialBackend()
+	if err != nil {
+		return SessionToken{}, err
+	}
+	defer conn.Close()
+
+	client := calyxv1.NewAuthServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), backendCallTimeout)
+	defer cancel()
+
+	resp, err := client.Login(ctx, &calyxv1.LoginRequest{
+		GoogleCredential: &calyxv1.LoginRequest_IdToken{IdToken: idToken},
+	})
+	if err != nil {
+		return SessionToken{}, fmt.Errorf("backend login failed: %w", err)
+	}
+	return SessionToken{
+		Token:     resp.GetSessionToken(),
+		ExpiresAt: resp.GetExpiresAt().AsTime(),
+	}, nil
 }
 
 // callbackResult carries the outcome of the OAuth redirect from the loopback
