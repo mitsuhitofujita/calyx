@@ -1,3 +1,4 @@
 .local/
 .antigravitycli/
 bin/
+.env
