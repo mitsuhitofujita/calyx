@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package mitsuhitofujita.calyx.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1;calyxv1";
+
+// AuthService exchanges a Google-issued credential for a Calyx session token.
+service AuthService {
+  // Login verifies a Google credential and returns a short-lived session JWT.
+  rpc Login(LoginRequest) returns (LoginResponse);
+}
+
+message LoginRequest {
+  // The Google-issued credential obtained by the CLI during browser sign-in.
+  // Exactly one variant is expected.
+  oneof google_credential {
+    // Google OIDC ID token (JWT). Implemented in this phase.
+    string id_token = 1;
+    // Google OAuth authorization code. Reserved; returns UNIMPLEMENTED for now.
+    string auth_code = 2;
+  }
+}
+
+message LoginResponse {
+  // The Calyx-issued session token (JWT) to be sent on subsequent requests.
+  string session_token = 1;
+  // When the session token expires.
+  google.protobuf.Timestamp expires_at = 2;
+}

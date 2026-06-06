@@ -49,6 +49,13 @@ run:
 verify addr=backend_addr:
     grpcurl -plaintext -d '{"name":"World"}' {{addr}} mitsuhitofujita.calyx.v1.SampleService/Hello
 
+# Exchange a Google ID token for a Calyx session JWT via AuthService.Login
+# (start `just run` in another shell). Supply the token inline or set it once via
+# the CALYX_GOOGLE_ID_TOKEN env var. Obtain a token with `calyx auth login`, e.g.:
+#   just login "$(go run ./apps/cli auth login)"
+login id_token=env_var_or_default("CALYX_GOOGLE_ID_TOKEN", "") addr=backend_addr:
+    grpcurl -plaintext -d '{"id_token":"{{id_token}}"}' {{addr}} mitsuhitofujita.calyx.v1.AuthService/Login
+
 # Tidy go.mod / go.sum.
 tidy:
     go mod tidy
