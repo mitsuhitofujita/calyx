@@ -22,7 +22,7 @@ Tokens are stored using the native credential stores provided by the operating s
 - Windows 11: Credential Manager
 - Linux: Secret Service (via libsecret over D-Bus)
 Note that macOS is currently out of scope.
-Environments where a credential store is unavailable are not supported. Proprietary file encryption is not adopted (since storing the encryption key on the same filesystem does not improve security).
+In environments where a credential store is unavailable (e.g., headless or development environments), the CLI falls back to writing the token to a file. Proprietary file-based encryption is not adopted (since storing the encryption key on the same filesystem does not improve security).
 
 ### Autonomous Auto-Update
 
@@ -41,20 +41,14 @@ Auto-updates must be triggered explicitly by executing a command. Similar to aut
 
 ### Structured Metadata Output for Autonomous Learning
 
-To enable AI agents to understand tool specifications accurately in advance, the CLI will provide a command to output the command hierarchy and expected arguments in a format like JSON Schema.
-
-<issue>
-While "a format like JSON Schema" is mentioned, we need to narrow down the target format. Depending on the purpose of integration, the appropriate format differs (e.g., OpenAPI, MCP (Model Context Protocol) tool schema, or structured man page/help outputs for CLIs).
-It is also unclear whether the metadata output applies to all commands or only a subset. Additionally, the versioning policy when schemas change between versions is currently undefined.
-</issue>
+To enable AI agents to understand tool specifications accurately in advance, the CLI will provide a command that outputs the command hierarchy and expected arguments in command-help format.
 
 ### Timeout and Orphan Process Prevention
 
-Manage the maximum execution time for each process and terminate upon timeout.
-To prevent child processes spawned in the background from remaining as zombies or running indefinitely on the system, lifecycle management must ensure all child processes are terminated when the parent process exits.
+Manage the maximum execution time for each process and terminate at a predetermined timeout.
+To prevent child processes spawned in the background from remaining resident on the system, lifecycle management must ensure all child processes are terminated when the parent process exits.
 
 <issue>
-It is undefined whether the timeout value is fixed per command or configurable via arguments or configuration files. If AI agents run long-running tasks, they need to be able to dynamically specify appropriate timeout values.
 The exact method for terminating child processes (whether to send SIGTERM for graceful termination or SIGKILL for forced termination) and the implementation policy for signal propagation (e.g., process group management, cgroups) are unresolved.
 </issue>
 
