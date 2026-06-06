@@ -33,6 +33,7 @@ func main() {
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nCommands:\n")
 		fmt.Fprintf(os.Stderr, "  sample hello <name>   greet <name> via the backend\n")
+		fmt.Fprintf(os.Stderr, "  auth login            sign in with Google (prints the Google ID token; development-only)\n")
 	}
 
 	flag.Parse()
@@ -60,6 +61,8 @@ func dispatch(args []string) error {
 	switch args[0] {
 	case "sample":
 		return runSample(args[1:])
+	case "auth":
+		return runAuth(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "calyx: unknown command %q\n", args[0])
 		return errUsage
