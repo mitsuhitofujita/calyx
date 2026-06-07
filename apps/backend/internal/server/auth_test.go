@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
@@ -92,7 +93,7 @@ func parseSessionClaims(t *testing.T, token string) sessionClaims {
 			return nil, errors.New("unexpected signing method")
 		}
 		return testSigningKey, nil
-	})
+	}, jwt.WithTimeFunc(func() time.Time { return testNow })) // pin expiry to the fixture clock
 	if err != nil {
 		t.Fatalf("failed to parse session token: %v", err)
 	}
@@ -204,5 +205,225 @@ func TestAuthServer_Login_ExpiryConsistency(t *testing.T) {
 	}
 	if gotExp, respExp := claims.ExpiresAt.Unix(), resp.GetExpiresAt().AsTime().Unix(); gotExp != respExp {
 		t.Errorf("JWT exp (%d) != LoginResponse.expires_at (%d)", gotExp, respExp)
+	}
+}
+
+// sessionTokenOpts parameterizes mintSessionToken so cases can vary the fields
+// that verification checks. The zero value yields a valid default token.
+type sessionTokenOpts struct {
+	signingKey []byte    // defaults to testSigningKey
+	issuer     string    // defaults to "calyx-backend"
+	audience   string    // defaults to "calyx-cli"
+	expiresAt  time.Time // defaults to testNow.Add(time.Hour)
+}
+
+// mintSessionToken signs a session JWT the way Login does, applying any
+// overrides in opts. It is used to construct the Status test inputs.
+func mintSessionToken(t *testing.T, opts sessionTokenOpts) string {
+	t.Helper()
+
+	key := opts.signingKey
+	if key == nil {
+		key = testSigningKey
+	}
+	issuer := opts.issuer
+	if issuer == "" {
+		issuer = "calyx-backend"
+	}
+	audience := opts.audience
+	if audience == "" {
+		audience = "calyx-cli"
+	}
+	exp := opts.expiresAt
+	if exp.IsZero() {
+		exp = testNow.Add(time.Hour)
+	}
+
+	claims := sessionClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Audience:  jwt.ClaimStrings{audience},
+			Subject:   testUser.Subject,
+			IssuedAt:  jwt.NewNumericDate(testNow),
+			ExpiresAt: jwt.NewNumericDate(exp),
+		},
+		Email:       testUser.Email,
+		Name:        testUser.Name,
+		Role:        placeholderRole,
+		Permissions: placeholderPermissions,
+	}
+
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(key)
+	if err != nil {
+		t.Fatalf("failed to sign session token: %v", err)
+	}
+	return signed
+}
+
+// statusContext returns an outgoing context carrying the session token as
+// "authorization: Bearer <token>" metadata, mirroring what the CLI attaches.
+func statusContext(token string) context.Context {
+	return metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+token)
+}
+
+func TestAuthServer_Status_ValidSession(t *testing.T) {
+	cfg := testAuthConfig()
+	client := newTestAuthClient(t, cfg, stubVerifier{user: testUser})
+
+	exp := testNow.Add(time.Hour)
+	token := mintSessionToken(t, sessionTokenOpts{expiresAt: exp})
+
+	resp, err := client.Status(statusContext(token), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if !resp.GetAuthenticated() {
+		t.Fatalf("authenticated = false, want true (message=%q)", resp.GetMessage())
+	}
+	if resp.GetMessage() != "session is valid" {
+		t.Errorf("message = %q, want %q", resp.GetMessage(), "session is valid")
+	}
+
+	sess := resp.GetSession()
+	if sess == nil {
+		t.Fatal("session is nil, want populated SessionInfo")
+	}
+	if sess.GetName() != testUser.Name {
+		t.Errorf("session.name = %q, want %q", sess.GetName(), testUser.Name)
+	}
+	if sess.GetEmail() != testUser.Email {
+		t.Errorf("session.email = %q, want %q", sess.GetEmail(), testUser.Email)
+	}
+	if sess.GetRole() != "admin" {
+		t.Errorf("session.role = %q, want %q", sess.GetRole(), "admin")
+	}
+	if perms := sess.GetPermissions(); len(perms) != 1 || perms[0] != "*" {
+		t.Errorf("session.permissions = %v, want [*]", perms)
+	}
+	if got, want := sess.GetExpiresAt().AsTime().Unix(), exp.Truncate(time.Second).Unix(); got != want {
+		t.Errorf("session.expires_at = %d, want %d", got, want)
+	}
+}
+
+func TestAuthServer_Status_NoMetadata(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	resp, err := client.Status(context.Background(), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+	if resp.GetMessage() != "no session token provided" {
+		t.Errorf("message = %q, want %q", resp.GetMessage(), "no session token provided")
+	}
+	if resp.GetSession() != nil {
+		t.Errorf("session = %v, want nil", resp.GetSession())
+	}
+}
+
+func TestAuthServer_Status_MalformedToken(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	resp, err := client.Status(statusContext("not-a-jwt"), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+	if resp.GetMessage() != "session token is invalid or expired" {
+		t.Errorf("message = %q, want %q", resp.GetMessage(), "session token is invalid or expired")
+	}
+	if resp.GetSession() != nil {
+		t.Errorf("session = %v, want nil", resp.GetSession())
+	}
+}
+
+func TestAuthServer_Status_WrongSignature(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	token := mintSessionToken(t, sessionTokenOpts{signingKey: []byte("a-different-key")})
+
+	resp, err := client.Status(statusContext(token), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+	if resp.GetMessage() != "session token is invalid or expired" {
+		t.Errorf("message = %q, want %q", resp.GetMessage(), "session token is invalid or expired")
+	}
+}
+
+func TestAuthServer_Status_ExpiredToken(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	// Server clock is fixed at testNow; mint a token that already expired.
+	token := mintSessionToken(t, sessionTokenOpts{expiresAt: testNow.Add(-time.Minute)})
+
+	resp, err := client.Status(statusContext(token), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+	if resp.GetMessage() != "session token is invalid or expired" {
+		t.Errorf("message = %q, want %q", resp.GetMessage(), "session token is invalid or expired")
+	}
+}
+
+func TestAuthServer_Status_WrongIssuer(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	token := mintSessionToken(t, sessionTokenOpts{issuer: "evil-issuer"})
+
+	resp, err := client.Status(statusContext(token), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+}
+
+func TestAuthServer_Status_WrongAudience(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	token := mintSessionToken(t, sessionTokenOpts{audience: "someone-else"})
+
+	resp, err := client.Status(statusContext(token), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if resp.GetAuthenticated() {
+		t.Error("authenticated = true, want false")
+	}
+}
+
+// TestAuthServer_Status_LoginRoundTrip proves the issue→verify round-trip: a
+// token freshly minted by Login is accepted by Status.
+func TestAuthServer_Status_LoginRoundTrip(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	login, err := client.Login(context.Background(), &calyxv1.LoginRequest{
+		GoogleCredential: &calyxv1.LoginRequest_IdToken{IdToken: "valid-google-id-token"},
+	})
+	if err != nil {
+		t.Fatalf("Login returned error: %v", err)
+	}
+
+	resp, err := client.Status(statusContext(login.GetSessionToken()), &calyxv1.StatusRequest{})
+	if err != nil {
+		t.Fatalf("Status returned error: %v", err)
+	}
+	if !resp.GetAuthenticated() {
+		t.Fatalf("authenticated = false, want true (message=%q)", resp.GetMessage())
+	}
+	if got, want := resp.GetSession().GetExpiresAt().AsTime().Unix(), login.GetExpiresAt().AsTime().Unix(); got != want {
+		t.Errorf("Status expires_at (%d) != Login expires_at (%d)", got, want)
 	}
 }

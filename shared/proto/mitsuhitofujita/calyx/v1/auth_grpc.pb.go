@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthService_Login_FullMethodName = "/mitsuhitofujita.calyx.v1.AuthService/Login"
+	AuthService_Login_FullMethodName  = "/mitsuhitofujita.calyx.v1.AuthService/Login"
+	AuthService_Status_FullMethodName = "/mitsuhitofujita.calyx.v1.AuthService/Status"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -30,6 +31,9 @@ const (
 type AuthServiceClient interface {
 	// Login verifies a Google credential and returns a short-lived session JWT.
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
+	// Status verifies the session token presented in the request metadata and
+	// reports whether the session is valid, along with its details when it is.
+	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
 
 type authServiceClient struct {
@@ -50,6 +54,16 @@ func (c *authServiceClient) Login(ctx context.Context, in *LoginRequest, opts ..
 	return out, nil
 }
 
+func (c *authServiceClient) Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StatusResponse)
+	err := c.cc.Invoke(ctx, AuthService_Status_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -58,6 +72,9 @@ func (c *authServiceClient) Login(ctx context.Context, in *LoginRequest, opts ..
 type AuthServiceServer interface {
 	// Login verifies a Google credential and returns a short-lived session JWT.
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
+	// Status verifies the session token presented in the request metadata and
+	// reports whether the session is valid, along with its details when it is.
+	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -70,6 +87,9 @@ type UnimplementedAuthServiceServer struct{}
 
 func (UnimplementedAuthServiceServer) Login(context.Context, *LoginRequest) (*LoginResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
+}
+func (UnimplementedAuthServiceServer) Status(context.Context, *StatusRequest) (*StatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Status not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -110,6 +130,24 @@ func _AuthService_Login_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_Status_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).Status(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_Status_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).Status(ctx, req.(*StatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -120,6 +158,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Login",
 			Handler:    _AuthService_Login_Handler,
+		},
+		{
+			MethodName: "Status",
+			Handler:    _AuthService_Status_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

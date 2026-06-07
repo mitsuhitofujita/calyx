@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/api/idtoken"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -128,6 +130,82 @@ func (s *AuthServer) loginWithIDToken(ctx context.Context, idToken string) (*cal
 		SessionToken: signed,
 		ExpiresAt:    timestamppb.New(exp.Truncate(time.Second)),
 	}, nil
+}
+
+// Status verifies the session token presented in the request metadata and
+// reports whether the session is valid. Missing/invalid/expired tokens are
+// reported in the response body (authenticated == false) rather than as a gRPC
+// error, so a future `calyx auth status` command can print a clear message.
+func (s *AuthServer) Status(ctx context.Context, _ *calyxv1.StatusRequest) (*calyxv1.StatusResponse, error) {
+	raw := bearerTokenFromContext(ctx)
+	if raw == "" {
+		return &calyxv1.StatusResponse{
+			Authenticated: false,
+			Message:       "no session token provided",
+		}, nil
+	}
+
+	claims, err := s.verifySessionToken(raw)
+	if err != nil {
+		// Generic message only: never leak parser internals or the raw token.
+		return &calyxv1.StatusResponse{
+			Authenticated: false,
+			Message:       "session token is invalid or expired",
+		}, nil
+	}
+
+	return &calyxv1.StatusResponse{
+		Authenticated: true,
+		Message:       "session is valid",
+		Session: &calyxv1.SessionInfo{
+			Name:        claims.Name,
+			Email:       claims.Email,
+			Role:        claims.Role,
+			Permissions: claims.Permissions,
+			ExpiresAt:   timestamppb.New(claims.ExpiresAt.Time),
+		},
+	}, nil
+}
+
+// verifySessionToken parses and validates a Calyx session JWT (HS256 signature,
+// issuer, audience, and expiry) using the same AuthConfig that Login signs with.
+// It returns the parsed claims on success. Expiry is evaluated against the
+// injectable clock (s.now) so verification stays consistent with Login and
+// tests remain deterministic. Intended for reuse by the future verification
+// interceptor.
+func (s *AuthServer) verifySessionToken(raw string) (*sessionClaims, error) {
+	var claims sessionClaims
+	_, err := jwt.ParseWithClaims(raw, &claims,
+		func(*jwt.Token) (any, error) { return s.cfg.SigningKey, nil },
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithIssuer(s.cfg.Issuer),
+		jwt.WithAudience(s.cfg.Audience),
+		jwt.WithExpirationRequired(),
+		jwt.WithTimeFunc(s.now),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &claims, nil
+}
+
+// bearerTokenFromContext returns the raw session token from the incoming
+// "authorization" metadata, stripping a case-insensitive "Bearer " prefix.
+// Returns "" when metadata or the header is absent/empty.
+func bearerTokenFromContext(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	vals := md.Get("authorization") // metadata keys are lowercased; Get is case-insensitive
+	if len(vals) == 0 {
+		return ""
+	}
+	v := strings.TrimSpace(vals[0])
+	if len(v) >= 7 && strings.EqualFold(v[:7], "Bearer ") {
+		return strings.TrimSpace(v[7:])
+	}
+	return v // tolerate a bare token without the scheme
 }
 
 // googleVerifier is the production googleIDTokenVerifier. It validates the

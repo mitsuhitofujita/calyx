@@ -10,6 +10,10 @@ option go_package = "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofuji
 service AuthService {
   // Login verifies a Google credential and returns a short-lived session JWT.
   rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Status verifies the session token presented in the request metadata and
+  // reports whether the session is valid, along with its details when it is.
+  rpc Status(StatusRequest) returns (StatusResponse);
 }
 
 message LoginRequest {
@@ -28,4 +32,34 @@ message LoginResponse {
   string session_token = 1;
   // When the session token expires.
   google.protobuf.Timestamp expires_at = 2;
+}
+
+// StatusRequest is intentionally empty: the session token is read from the
+// "authorization: Bearer <session_token>" gRPC metadata header.
+message StatusRequest {}
+
+message StatusResponse {
+  // Whether a valid (signed, unexpired, correctly-scoped) session token was
+  // presented in the request metadata.
+  bool authenticated = 1;
+  // Human-readable detail. On success, a brief confirmation; on failure, the
+  // reason (e.g. no token provided, or the session is invalid/expired).
+  string message = 2;
+  // Populated only when authenticated == true.
+  SessionInfo session = 3;
+}
+
+// SessionInfo carries the verified session's basic details.
+message SessionInfo {
+  // User's display name (from the JWT "name" claim).
+  string name = 1;
+  // User's email (from the JWT "email" claim); supplementary.
+  string email = 2;
+  // Role from the JWT "role" claim (currently the fixed placeholder "admin").
+  string role = 3;
+  // Permissions/authorizations from the JWT "permissions" claim
+  // (currently the fixed placeholder ["*"]).
+  repeated string permissions = 4;
+  // When the session expires (mirrors the JWT "exp" claim).
+  google.protobuf.Timestamp expires_at = 5;
 }

@@ -163,6 +163,192 @@ func (x *LoginResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// StatusRequest is intentionally empty: the session token is read from the
+// "authorization: Bearer <session_token>" gRPC metadata header.
+type StatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StatusRequest) Reset() {
+	*x = StatusRequest{}
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StatusRequest) ProtoMessage() {}
+
+func (x *StatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
+func (*StatusRequest) Descriptor() ([]byte, []int) {
+	return file_mitsuhitofujita_calyx_v1_auth_proto_rawDescGZIP(), []int{2}
+}
+
+type StatusResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Whether a valid (signed, unexpired, correctly-scoped) session token was
+	// presented in the request metadata.
+	Authenticated bool `protobuf:"varint,1,opt,name=authenticated,proto3" json:"authenticated,omitempty"`
+	// Human-readable detail. On success, a brief confirmation; on failure, the
+	// reason (e.g. no token provided, or the session is invalid/expired).
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// Populated only when authenticated == true.
+	Session       *SessionInfo `protobuf:"bytes,3,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StatusResponse) Reset() {
+	*x = StatusResponse{}
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StatusResponse) ProtoMessage() {}
+
+func (x *StatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
+func (*StatusResponse) Descriptor() ([]byte, []int) {
+	return file_mitsuhitofujita_calyx_v1_auth_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StatusResponse) GetAuthenticated() bool {
+	if x != nil {
+		return x.Authenticated
+	}
+	return false
+}
+
+func (x *StatusResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *StatusResponse) GetSession() *SessionInfo {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+// SessionInfo carries the verified session's basic details.
+type SessionInfo struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// User's display name (from the JWT "name" claim).
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// User's email (from the JWT "email" claim); supplementary.
+	Email string `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	// Role from the JWT "role" claim (currently the fixed placeholder "admin").
+	Role string `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	// Permissions/authorizations from the JWT "permissions" claim
+	// (currently the fixed placeholder ["*"]).
+	Permissions []string `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	// When the session expires (mirrors the JWT "exp" claim).
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionInfo) Reset() {
+	*x = SessionInfo{}
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionInfo) ProtoMessage() {}
+
+func (x *SessionInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionInfo.ProtoReflect.Descriptor instead.
+func (*SessionInfo) Descriptor() ([]byte, []int) {
+	return file_mitsuhitofujita_calyx_v1_auth_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SessionInfo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetPermissions() []string {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *SessionInfo) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_mitsuhitofujita_calyx_v1_auth_proto protoreflect.FileDescriptor
 
 const file_mitsuhitofujita_calyx_v1_auth_proto_rawDesc = "" +
@@ -175,9 +361,22 @@ const file_mitsuhitofujita_calyx_v1_auth_proto_rawDesc = "" +
 	"\rLoginResponse\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2g\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x0f\n" +
+	"\rStatusRequest\"\x91\x01\n" +
+	"\x0eStatusResponse\x12$\n" +
+	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12?\n" +
+	"\asession\x18\x03 \x01(\v2%.mitsuhitofujita.calyx.v1.SessionInfoR\asession\"\xa8\x01\n" +
+	"\vSessionInfo\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x12\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12 \n" +
+	"\vpermissions\x18\x04 \x03(\tR\vpermissions\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\xc4\x01\n" +
 	"\vAuthService\x12X\n" +
-	"\x05Login\x12&.mitsuhitofujita.calyx.v1.LoginRequest\x1a'.mitsuhitofujita.calyx.v1.LoginResponseBPZNgithub.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1;calyxv1b\x06proto3"
+	"\x05Login\x12&.mitsuhitofujita.calyx.v1.LoginRequest\x1a'.mitsuhitofujita.calyx.v1.LoginResponse\x12[\n" +
+	"\x06Status\x12'.mitsuhitofujita.calyx.v1.StatusRequest\x1a(.mitsuhitofujita.calyx.v1.StatusResponseBPZNgithub.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1;calyxv1b\x06proto3"
 
 var (
 	file_mitsuhitofujita_calyx_v1_auth_proto_rawDescOnce sync.Once
@@ -191,21 +390,28 @@ func file_mitsuhitofujita_calyx_v1_auth_proto_rawDescGZIP() []byte {
 	return file_mitsuhitofujita_calyx_v1_auth_proto_rawDescData
 }
 
-var file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_mitsuhitofujita_calyx_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_mitsuhitofujita_calyx_v1_auth_proto_goTypes = []any{
 	(*LoginRequest)(nil),          // 0: mitsuhitofujita.calyx.v1.LoginRequest
 	(*LoginResponse)(nil),         // 1: mitsuhitofujita.calyx.v1.LoginResponse
-	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
+	(*StatusRequest)(nil),         // 2: mitsuhitofujita.calyx.v1.StatusRequest
+	(*StatusResponse)(nil),        // 3: mitsuhitofujita.calyx.v1.StatusResponse
+	(*SessionInfo)(nil),           // 4: mitsuhitofujita.calyx.v1.SessionInfo
+	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
 }
 var file_mitsuhitofujita_calyx_v1_auth_proto_depIdxs = []int32{
-	2, // 0: mitsuhitofujita.calyx.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
-	0, // 1: mitsuhitofujita.calyx.v1.AuthService.Login:input_type -> mitsuhitofujita.calyx.v1.LoginRequest
-	1, // 2: mitsuhitofujita.calyx.v1.AuthService.Login:output_type -> mitsuhitofujita.calyx.v1.LoginResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: mitsuhitofujita.calyx.v1.LoginResponse.expires_at:type_name -> google.protobuf.Timestamp
+	4, // 1: mitsuhitofujita.calyx.v1.StatusResponse.session:type_name -> mitsuhitofujita.calyx.v1.SessionInfo
+	5, // 2: mitsuhitofujita.calyx.v1.SessionInfo.expires_at:type_name -> google.protobuf.Timestamp
+	0, // 3: mitsuhitofujita.calyx.v1.AuthService.Login:input_type -> mitsuhitofujita.calyx.v1.LoginRequest
+	2, // 4: mitsuhitofujita.calyx.v1.AuthService.Status:input_type -> mitsuhitofujita.calyx.v1.StatusRequest
+	1, // 5: mitsuhitofujita.calyx.v1.AuthService.Login:output_type -> mitsuhitofujita.calyx.v1.LoginResponse
+	3, // 6: mitsuhitofujita.calyx.v1.AuthService.Status:output_type -> mitsuhitofujita.calyx.v1.StatusResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_mitsuhitofujita_calyx_v1_auth_proto_init() }
@@ -223,7 +429,7 @@ func file_mitsuhitofujita_calyx_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mitsuhitofujita_calyx_v1_auth_proto_rawDesc), len(file_mitsuhitofujita_calyx_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
