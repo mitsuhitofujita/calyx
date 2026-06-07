@@ -13,18 +13,18 @@ Engineered with AI-first principles, it features native structured JSON outputs,
 ## Development
 
 The devcontainer preinstalls the Go toolchain plus `buf`, `protoc-gen-go`,
-`protoc-gen-go-grpc`, and `grpcurl`. On a bare host, install them with `make tools`.
+`protoc-gen-go-grpc`, and `grpcurl`. On a bare host, install them with `just tools`.
 
 ```bash
-make generate   # regenerate Go code from shared/proto/**/*.proto (buf lint + generate)
-make build      # compile all packages
-make test       # run the test suite
-make run        # start the backend gRPC server on :50051 (override via CALYX_BACKEND_ADDR)
+just generate   # regenerate Go code from shared/proto/**/*.proto (buf lint + generate)
+just build      # compile all packages
+just test       # run the test suite
+just run        # start the backend gRPC server on :50051 (override via CALYX_BACKEND_ADDR)
 ```
 
 ### Try the sample service
 
-In one shell start the server with `make run`, then in another:
+In one shell start the server with `just run`, then in another:
 
 ```bash
 grpcurl -plaintext -d '{"name":"World"}' localhost:50051 mitsuhitofujita.calyx.v1.SampleService/Hello
