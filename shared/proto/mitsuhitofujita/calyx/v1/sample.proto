@@ -9,6 +9,12 @@ option go_package = "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofuji
 // authentication service is implemented.
 service SampleService {
   // Hello returns a greeting for the given name.
+  //
+  // Status codes:
+  //   OK - greeting returned; see HelloResponse.
+  // Authentication is not enforced: the CLI attaches the session token as
+  // "authorization: Bearer <token>" metadata when one is stored, but this RPC
+  // does not require or verify it.
   rpc Hello(HelloRequest) returns (HelloResponse);
 }
 

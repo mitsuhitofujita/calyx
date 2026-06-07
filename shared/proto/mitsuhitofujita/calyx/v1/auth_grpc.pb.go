@@ -30,9 +30,23 @@ const (
 // AuthService exchanges a Google-issued credential for a Calyx session token.
 type AuthServiceClient interface {
 	// Login verifies a Google credential and returns a short-lived session JWT.
+	//
+	// Status codes:
+	//
+	//	OK               - session minted; see LoginResponse.
+	//	INVALID_ARGUMENT - no credential provided, or an empty id_token.
+	//	UNIMPLEMENTED    - auth_code variant (not implemented this phase).
+	//	UNAUTHENTICATED  - Google id_token verification failed.
+	//	INTERNAL         - failed to sign the session token.
 	Login(ctx context.Context, in *LoginRequest, opts ...grpc.CallOption) (*LoginResponse, error)
-	// Status verifies the session token presented in the request metadata and
-	// reports whether the session is valid, along with its details when it is.
+	// Status verifies the session token presented in the request metadata
+	// ("authorization: Bearer <session_token>") and reports whether the session
+	// is valid, along with its details when it is.
+	//
+	// Auth outcomes are reported in the response body (authenticated = false with
+	// the reason in `message`), NOT as a gRPC error: Status returns OK even for a
+	// missing, invalid, or expired token. A gRPC error indicates only a genuine
+	// server fault.
 	Status(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
 }
 
@@ -71,9 +85,23 @@ func (c *authServiceClient) Status(ctx context.Context, in *StatusRequest, opts 
 // AuthService exchanges a Google-issued credential for a Calyx session token.
 type AuthServiceServer interface {
 	// Login verifies a Google credential and returns a short-lived session JWT.
+	//
+	// Status codes:
+	//
+	//	OK               - session minted; see LoginResponse.
+	//	INVALID_ARGUMENT - no credential provided, or an empty id_token.
+	//	UNIMPLEMENTED    - auth_code variant (not implemented this phase).
+	//	UNAUTHENTICATED  - Google id_token verification failed.
+	//	INTERNAL         - failed to sign the session token.
 	Login(context.Context, *LoginRequest) (*LoginResponse, error)
-	// Status verifies the session token presented in the request metadata and
-	// reports whether the session is valid, along with its details when it is.
+	// Status verifies the session token presented in the request metadata
+	// ("authorization: Bearer <session_token>") and reports whether the session
+	// is valid, along with its details when it is.
+	//
+	// Auth outcomes are reported in the response body (authenticated = false with
+	// the reason in `message`), NOT as a gRPC error: Status returns OK even for a
+	// missing, invalid, or expired token. A gRPC error indicates only a genuine
+	// server fault.
 	Status(context.Context, *StatusRequest) (*StatusResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }

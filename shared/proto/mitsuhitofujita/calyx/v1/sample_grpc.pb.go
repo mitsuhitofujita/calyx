@@ -31,6 +31,14 @@ const (
 // authentication service is implemented.
 type SampleServiceClient interface {
 	// Hello returns a greeting for the given name.
+	//
+	// Status codes:
+	//
+	//	OK - greeting returned; see HelloResponse.
+	//
+	// Authentication is not enforced: the CLI attaches the session token as
+	// "authorization: Bearer <token>" metadata when one is stored, but this RPC
+	// does not require or verify it.
 	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 }
 
@@ -61,6 +69,14 @@ func (c *sampleServiceClient) Hello(ctx context.Context, in *HelloRequest, opts 
 // authentication service is implemented.
 type SampleServiceServer interface {
 	// Hello returns a greeting for the given name.
+	//
+	// Status codes:
+	//
+	//	OK - greeting returned; see HelloResponse.
+	//
+	// Authentication is not enforced: the CLI attaches the session token as
+	// "authorization: Bearer <token>" metadata when one is stored, but this RPC
+	// does not require or verify it.
 	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
 	mustEmbedUnimplementedSampleServiceServer()
 }
