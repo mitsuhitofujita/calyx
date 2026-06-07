@@ -4,6 +4,7 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         curl \
         git \
+        jq \
         just \
         ripgrep
 RUN apt-get autoremove -y && \

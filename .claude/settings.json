@@ -5,6 +5,8 @@
             "Bash(just build)",
             "Bash(just lint)",
             "Bash(just test)",
+            "Bash(rg)",
+            "Bash(jq)",
             "WebFetch(domain:developers.google.com)"
         ],
         "deny": [
