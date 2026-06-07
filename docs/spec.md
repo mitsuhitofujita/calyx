@@ -46,3 +46,10 @@ This document outlines the technical specifications for the CLI and backend syst
 *   [`apps/cli`]: The command-line interface tool (the front-end operated by AI agents).
 *   [`apps/backend`]: The remote server handling authentication, verification, and persistence.
 *   [`shared/proto`]: Protocol Buffer definition files and the auto-generated Go code.
+    These `.proto` files are the **single source of truth** for the gRPC contract: read them
+    directly to learn every service, RPC, message, and field. Per-RPC doc comments also record
+    the gRPC status codes and behavioral notes (e.g. that `AuthService.Status` reports auth
+    outcomes in the response body rather than as a gRPC error). There is intentionally **no**
+    separate, hand-maintained gRPC reference document, to avoid dual-maintenance and drift.
+    Server reflection is enabled, so `grpcurl -plaintext <addr> list` / `... describe` can
+    introspect the live surface at runtime.
