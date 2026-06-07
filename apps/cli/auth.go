@@ -39,23 +39,6 @@ const (
 	backendCallTimeout = 10 * time.Second
 )
 
-// runAuth dispatches `calyx auth` subcommands.
-func runAuth(args []string) error {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: calyx auth <login|status>")
-		return errUsage
-	}
-	switch args[0] {
-	case "login":
-		return runAuthLogin(args[1:])
-	case "status":
-		return runAuthStatus(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "calyx auth: unknown command %q\n", args[0])
-		return errUsage
-	}
-}
-
 // runAuthLogin runs the browser-based Google OAuth flow, exchanges the obtained
 // Google ID token for a Calyx session token via AuthService.Login, persists the
 // session token via the configured TokenStore, and prints a non-secret

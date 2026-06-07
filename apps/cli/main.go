@@ -29,14 +29,9 @@ var errUsage = errors.New("usage error")
 func main() {
 	versionFlag := flag.Bool("version", false, "print version information")
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of calyx:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nCommands:\n")
-		fmt.Fprintf(os.Stderr, "  sample hello <name>   greet <name> via the backend\n")
-		fmt.Fprintf(os.Stderr, "  auth login            sign in with Google and store a session token\n")
-		fmt.Fprintf(os.Stderr, "  auth status           show the current session status\n")
-	}
+	// Derive help text from the registry so it cannot drift from what dispatch
+	// runs or from `calyx schema`.
+	flag.Usage = func() { commandRegistry().writeUsage(os.Stderr, nil) }
 
 	flag.Parse()
 
@@ -59,30 +54,15 @@ func main() {
 	}
 }
 
+// dispatch routes args to a command via the shared registry and runs it. Routing
+// (group walking, unknown/missing-subcommand usage) lives in resolve; the leaf
+// handler validates its own arguments.
 func dispatch(args []string) error {
-	switch args[0] {
-	case "sample":
-		return runSample(args[1:])
-	case "auth":
-		return runAuth(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "calyx: unknown command %q\n", args[0])
-		return errUsage
+	cmd, rest, err := commandRegistry().resolve(args)
+	if err != nil {
+		return err
 	}
-}
-
-func runSample(args []string) error {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: calyx sample hello <name>")
-		return errUsage
-	}
-	switch args[0] {
-	case "hello":
-		return runHello(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "calyx sample: unknown command %q\n", args[0])
-		return errUsage
-	}
+	return cmd.Run(rest)
 }
 
 func runHello(args []string) error {

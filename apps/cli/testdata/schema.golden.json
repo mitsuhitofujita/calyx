@@ -1,0 +1,217 @@
+{
+  "schema_version": "1",
+  "cli": {
+    "name": "calyx",
+    "version": "v0.0.0"
+  },
+  "commands": [
+    {
+      "path": [],
+      "summary": "Calyx sample CLI: a thin gRPC client of the backend.",
+      "group": true,
+      "args": [],
+      "flags": [
+        {
+          "name": "version",
+          "type": "bool",
+          "purpose": "print version information"
+        }
+      ],
+      "env": [],
+      "exit_codes": [
+        {
+          "code": 0,
+          "when": "usage printed (no args) or --version printed"
+        },
+        {
+          "code": 1,
+          "when": "unknown command"
+        }
+      ],
+      "examples": [
+        "calyx --version"
+      ]
+    },
+    {
+      "path": [
+        "schema"
+      ],
+      "summary": "print the CLI command tree and metadata as JSON",
+      "args": [],
+      "flags": [],
+      "env": [],
+      "exit_codes": [
+        {
+          "code": 0,
+          "when": "JSON printed"
+        },
+        {
+          "code": 1,
+          "when": "usage error"
+        }
+      ],
+      "examples": [
+        "calyx schema"
+      ]
+    },
+    {
+      "path": [
+        "sample"
+      ],
+      "summary": "sample-service commands (a thin gRPC client of the backend)",
+      "group": true,
+      "args": [],
+      "flags": [],
+      "env": [],
+      "exit_codes": [],
+      "examples": []
+    },
+    {
+      "path": [
+        "sample",
+        "hello"
+      ],
+      "summary": "greet \u003cname\u003e via the backend",
+      "args": [
+        {
+          "name": "name",
+          "required": true,
+          "repeated": false
+        }
+      ],
+      "flags": [],
+      "env": [
+        {
+          "name": "CALYX_BACKEND_ADDR",
+          "default": "localhost:50051",
+          "purpose": "backend gRPC address"
+        },
+        {
+          "name": "CALYX_TOKEN_STORE",
+          "default": "file",
+          "purpose": "session-token store backend: \"file\" (default) or \"keyring\""
+        },
+        {
+          "name": "CALYX_CONFIG_DIR",
+          "purpose": "base dir for the session file (\u003cconfig-dir\u003e/calyx/session.json); defaults to the OS per-user config dir"
+        }
+      ],
+      "exit_codes": [
+        {
+          "code": 0,
+          "when": "greeting printed"
+        },
+        {
+          "code": 1,
+          "when": "usage error or RPC failure"
+        }
+      ],
+      "examples": [
+        "calyx sample hello World"
+      ]
+    },
+    {
+      "path": [
+        "auth"
+      ],
+      "summary": "authentication commands (Google sign-in and session status)",
+      "group": true,
+      "args": [],
+      "flags": [],
+      "env": [],
+      "exit_codes": [],
+      "examples": []
+    },
+    {
+      "path": [
+        "auth",
+        "login"
+      ],
+      "summary": "sign in with Google and store a session token",
+      "args": [],
+      "flags": [],
+      "env": [
+        {
+          "name": "CALYX_GOOGLE_CLIENT_ID",
+          "required": true,
+          "purpose": "Google OAuth client ID (read from .env in the working dir or the environment)"
+        },
+        {
+          "name": "CALYX_GOOGLE_CLIENT_SECRET",
+          "required": true,
+          "purpose": "Google OAuth client secret (read from .env in the working dir or the environment)"
+        },
+        {
+          "name": "CALYX_OAUTH_REDIRECT_ADDR",
+          "default": "127.0.0.1:8765",
+          "purpose": "loopback host:port for the OAuth callback server"
+        },
+        {
+          "name": "CALYX_TOKEN_STORE",
+          "default": "file",
+          "purpose": "session-token store backend: \"file\" (default) or \"keyring\""
+        },
+        {
+          "name": "CALYX_CONFIG_DIR",
+          "purpose": "base dir for the session file (\u003cconfig-dir\u003e/calyx/session.json); defaults to the OS per-user config dir"
+        },
+        {
+          "name": "CALYX_BACKEND_ADDR",
+          "default": "localhost:50051",
+          "purpose": "backend gRPC address"
+        }
+      ],
+      "exit_codes": [
+        {
+          "code": 0,
+          "when": "logged in, session token saved"
+        },
+        {
+          "code": 1,
+          "when": "usage error, missing config, OAuth failure, or backend failure"
+        }
+      ],
+      "examples": [
+        "calyx auth login"
+      ]
+    },
+    {
+      "path": [
+        "auth",
+        "status"
+      ],
+      "summary": "show the current session status",
+      "args": [],
+      "flags": [],
+      "env": [
+        {
+          "name": "CALYX_TOKEN_STORE",
+          "default": "file",
+          "purpose": "session-token store backend: \"file\" (default) or \"keyring\""
+        },
+        {
+          "name": "CALYX_CONFIG_DIR",
+          "purpose": "base dir for the session file (\u003cconfig-dir\u003e/calyx/session.json); defaults to the OS per-user config dir"
+        },
+        {
+          "name": "CALYX_BACKEND_ADDR",
+          "default": "localhost:50051",
+          "purpose": "backend gRPC address"
+        }
+      ],
+      "exit_codes": [
+        {
+          "code": 0,
+          "when": "status reported (authenticated or not)"
+        },
+        {
+          "code": 1,
+          "when": "usage error, misconfigured store, load error, or unreachable backend"
+        }
+      ],
+      "examples": [
+        "calyx auth status"
+      ]
+    }
+  ]
+}
