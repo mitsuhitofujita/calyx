@@ -35,6 +35,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nCommands:\n")
 		fmt.Fprintf(os.Stderr, "  sample hello <name>   greet <name> via the backend\n")
 		fmt.Fprintf(os.Stderr, "  auth login            sign in with Google and store a session token\n")
+		fmt.Fprintf(os.Stderr, "  auth status           show the current session status\n")
 	}
 
 	flag.Parse()

@@ -4,17 +4,20 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/grpc/metadata"
 
 	calyxv1 "github.com/mitsuhitofujita/calyx/shared/proto/mitsuhitofujita/calyx/v1"
 )
@@ -39,12 +42,14 @@ const (
 // runAuth dispatches `calyx auth` subcommands.
 func runAuth(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: calyx auth login")
+		fmt.Fprintln(os.Stderr, "usage: calyx auth <login|status>")
 		return errUsage
 	}
 	switch args[0] {
 	case "login":
 		return runAuthLogin(args[1:])
+	case "status":
+		return runAuthStatus(args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "calyx auth: unknown command %q\n", args[0])
 		return errUsage
@@ -135,6 +140,84 @@ func exchangeIDToken(idToken string) (SessionToken, error) {
 		Token:     resp.GetSessionToken(),
 		ExpiresAt: resp.GetExpiresAt().AsTime(),
 	}, nil
+}
+
+// runAuthStatus reports whether the locally stored session token is valid. It
+// loads the token, asks the backend to verify it (AuthService.Status), and prints
+// the result. A missing local token is reported directly without a backend call.
+// Both authenticated and not-authenticated are successful reports (exit 0); only
+// operational failures (misconfigured store, load error, unreachable backend)
+// return an error.
+func runAuthStatus(args []string) error {
+	if len(args) != 0 {
+		fmt.Fprintln(os.Stderr, "usage: calyx auth status")
+		return errUsage
+	}
+
+	// Resolve the store before any network call so a misconfigured
+	// CALYX_TOKEN_STORE fails fast.
+	store, err := NewTokenStore()
+	if err != nil {
+		return err
+	}
+
+	tok, err := store.Load()
+	if errors.Is(err, ErrNoToken) {
+		// No local token: certainly not authenticated, so skip the backend.
+		fmt.Println(formatStatus(&calyxv1.StatusResponse{Authenticated: false, Message: "not logged in"}))
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not load session token: %w", err)
+	}
+
+	conn, err := dialBackend()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	resp, err := fetchStatus(calyxv1.NewAuthServiceClient(conn), tok.Token)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(formatStatus(resp))
+	return nil
+}
+
+// fetchStatus attaches the session token as Bearer metadata and calls Status.
+func fetchStatus(client calyxv1.AuthServiceClient, token string) (*calyxv1.StatusResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), backendCallTimeout)
+	defer cancel()
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	resp, err := client.Status(ctx, &calyxv1.StatusRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("backend status check failed: %w", err)
+	}
+	return resp, nil
+}
+
+// formatStatus renders a StatusResponse as plain text for `calyx auth status`. It
+// is a pure function (no I/O); the caller prints the returned string. The final
+// line carries no trailing newline since the caller uses fmt.Println.
+func formatStatus(resp *calyxv1.StatusResponse) string {
+	if !resp.GetAuthenticated() {
+		return fmt.Sprintf(
+			"Status:  not authenticated (%s)\nRun `calyx auth login` to authenticate.",
+			resp.GetMessage())
+	}
+	s := resp.GetSession()
+	var b strings.Builder
+	fmt.Fprintln(&b, "Status:      authenticated")
+	fmt.Fprintf(&b, "Name:        %s\n", s.GetName())
+	if s.GetEmail() != "" {
+		fmt.Fprintf(&b, "Email:       %s\n", s.GetEmail())
+	}
+	fmt.Fprintf(&b, "Role:        %s\n", s.GetRole())
+	fmt.Fprintf(&b, "Permissions: %s\n", strings.Join(s.GetPermissions(), ", "))
+	fmt.Fprintf(&b, "Expires:     %s", s.GetExpiresAt().AsTime().UTC().Format(time.RFC3339))
+	return b.String()
 }
 
 // callbackResult carries the outcome of the OAuth redirect from the loopback
