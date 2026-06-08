@@ -163,6 +163,23 @@ func TestAuthServer_Login_InvalidGoogleToken(t *testing.T) {
 	}
 }
 
+// TestAuthServer_Login_EmptyIDToken covers the loginWithIDToken empty-token
+// guard: an explicit empty id_token (a present-but-blank credential, distinct
+// from the unset-oneof default branch) is rejected with InvalidArgument.
+func TestAuthServer_Login_EmptyIDToken(t *testing.T) {
+	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
+
+	_, err := client.Login(context.Background(), &calyxv1.LoginRequest{
+		GoogleCredential: &calyxv1.LoginRequest_IdToken{IdToken: ""},
+	})
+	if err == nil {
+		t.Fatal("Login succeeded unexpectedly for empty id_token")
+	}
+	if got := status.Code(err); got != codes.InvalidArgument {
+		t.Errorf("status code = %v, want %v", got, codes.InvalidArgument)
+	}
+}
+
 func TestAuthServer_Login_AuthCodeUnimplemented(t *testing.T) {
 	client := newTestAuthClient(t, testAuthConfig(), stubVerifier{user: testUser})
 
@@ -425,5 +442,111 @@ func TestAuthServer_Status_LoginRoundTrip(t *testing.T) {
 	}
 	if got, want := resp.GetSession().GetExpiresAt().AsTime().Unix(), login.GetExpiresAt().AsTime().Unix(); got != want {
 		t.Errorf("Status expires_at (%d) != Login expires_at (%d)", got, want)
+	}
+}
+
+// mintNoneToken signs a session JWT with the "none" algorithm, which the
+// verifier must reject because it only allows HS256.
+func mintNoneToken(t *testing.T) string {
+	t.Helper()
+
+	claims := sessionClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "calyx-backend",
+			Audience:  jwt.ClaimStrings{"calyx-cli"},
+			Subject:   testUser.Subject,
+			IssuedAt:  jwt.NewNumericDate(testNow),
+			ExpiresAt: jwt.NewNumericDate(testNow.Add(time.Hour)),
+		},
+		Email:       testUser.Email,
+		Name:        testUser.Name,
+		Role:        placeholderRole,
+		Permissions: placeholderPermissions,
+	}
+
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodNone, claims).SignedString(jwt.UnsafeAllowNoneSignatureType)
+	if err != nil {
+		t.Fatalf("failed to sign none-alg token: %v", err)
+	}
+	return signed
+}
+
+// TestVerifySessionToken exercises verifySessionToken directly (no bufconn) so
+// every validation branch — signature, issuer, audience, expiry, the
+// HS256-only method restriction, and a malformed token — is asserted as a fast
+// unit. The server uses a fixed clock so expiry is deterministic.
+func TestVerifySessionToken(t *testing.T) {
+	s := newAuthServer(testAuthConfig(), stubVerifier{})
+	s.now = func() time.Time { return testNow }
+
+	cases := []struct {
+		name    string
+		token   string
+		wantErr bool
+	}{
+		{"valid", mintSessionToken(t, sessionTokenOpts{}), false},
+		{"expired", mintSessionToken(t, sessionTokenOpts{expiresAt: testNow.Add(-time.Minute)}), true},
+		{"wrong key", mintSessionToken(t, sessionTokenOpts{signingKey: []byte("a-different-key")}), true},
+		{"wrong issuer", mintSessionToken(t, sessionTokenOpts{issuer: "evil-issuer"}), true},
+		{"wrong audience", mintSessionToken(t, sessionTokenOpts{audience: "someone-else"}), true},
+		{"malformed string", "not-a-jwt", true},
+		{"none algorithm", mintNoneToken(t), true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims, err := s.verifySessionToken(tc.token)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("verifySessionToken(%s) = nil error, want error", tc.name)
+				}
+				if claims != nil {
+					t.Errorf("verifySessionToken(%s) claims = %v, want nil on error", tc.name, claims)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("verifySessionToken(%s) returned error: %v", tc.name, err)
+			}
+			if claims == nil {
+				t.Fatalf("verifySessionToken(%s) claims = nil, want non-nil", tc.name)
+			}
+		})
+	}
+}
+
+// TestBearerTokenFromContext covers the metadata-extraction branches: no
+// metadata at all, the authorization key absent, an empty value, the
+// case-insensitive "Bearer " prefix, surrounding whitespace, and a bare token
+// without the scheme.
+func TestBearerTokenFromContext(t *testing.T) {
+	withMD := func(v string) context.Context {
+		return metadata.NewIncomingContext(context.Background(), metadata.MD{"authorization": []string{v}})
+	}
+
+	cases := []struct {
+		name string
+		ctx  context.Context
+		want string
+	}{
+		{"no metadata", context.Background(), ""},
+		{"key absent", metadata.NewIncomingContext(context.Background(), metadata.MD{"other": []string{"x"}}), ""},
+		{"empty value", withMD(""), ""},
+		{"bearer prefix", withMD("Bearer abc"), "abc"},
+		{"lowercase bearer", withMD("bearer abc"), "abc"},
+		{"surrounding whitespace", withMD("  Bearer   abc  "), "abc"},
+		{"bare token", withMD("abc"), "abc"},
+		// "Bearer " (scheme, empty remainder) is TrimSpace'd to the 6-char
+		// "Bearer", which fails the 7-char prefix check and is returned as a
+		// bare token — the documented "tolerate a bare token" branch.
+		{"scheme only", withMD("Bearer "), "Bearer"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := bearerTokenFromContext(tc.ctx); got != tc.want {
+				t.Errorf("bearerTokenFromContext(%s) = %q, want %q", tc.name, got, tc.want)
+			}
+		})
 	}
 }

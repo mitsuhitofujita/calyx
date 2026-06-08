@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -57,6 +58,8 @@ func TestSampleServer_Hello(t *testing.T) {
 		{name: "empty name", in: "", want: "Hello, ."},
 		{name: "regular name", in: "Alice", want: "Hello, Alice."},
 		{name: "issue example", in: "World", want: "Hello, World."},
+		{name: "unicode name", in: "世界", want: "Hello, 世界."},
+		{name: "long name", in: strings.Repeat("a", 1000), want: "Hello, " + strings.Repeat("a", 1000) + "."},
 	}
 
 	for _, tt := range tests {

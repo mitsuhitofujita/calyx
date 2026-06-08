@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 
@@ -103,6 +104,30 @@ func TestSayHello_NoToken(t *testing.T) {
 
 	if got := stub.gotMD.Get("authorization"); len(got) != 0 {
 		t.Errorf("authorization metadata = %v, want none (unauthenticated path)", got)
+	}
+}
+
+// TestRunHello_RejectsBadArity covers the runHello arity guard: any argument
+// count other than one returns errUsage before dialing a backend, so no server
+// is needed. The one-arg success path needs a backend and is covered by the
+// sayHello tests and the E2E layer.
+func TestRunHello_RejectsBadArity(t *testing.T) {
+	t.Setenv("CALYX_CONFIG_DIR", t.TempDir())
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{"no args", []string{}},
+		{"too many args", []string{"a", "b"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := runHello(tc.args); !errors.Is(err, errUsage) {
+				t.Fatalf("runHello(%v) = %v, want errUsage", tc.args, err)
+			}
+		})
 	}
 }
 
